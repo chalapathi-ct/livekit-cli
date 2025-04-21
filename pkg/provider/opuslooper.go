@@ -54,6 +54,7 @@ func NewOpusAudioLooper(input io.Reader) (*OpusAudioLooper, error) {
 func (l *OpusAudioLooper) Codec() webrtc.RTPCodecCapability {
 	return webrtc.RTPCodecCapability{
 		MimeType: "audio/opus",
+		Channels: 1,
 	}
 }
 

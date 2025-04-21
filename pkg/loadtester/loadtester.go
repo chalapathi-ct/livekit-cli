@@ -37,10 +37,10 @@ type LoadTester struct {
 	lock                   sync.Mutex
 	room                   *lksdk.Room
 	running                atomic.Bool
-	// participant ID => quality
-	trackQualities map[string]livekit.VideoQuality
-
-	stats *sync.Map
+	trackQualities         map[string]livekit.VideoQuality
+	bitrate                int64
+	videoQuality           string // 1280x5x3 widhtxheightxframerate
+	stats                  *sync.Map
 }
 
 type Layout string
@@ -152,7 +152,6 @@ func (t *LoadTester) PublishAudioTrack(name string) (string, error) {
 		return "", nil
 	}
 
-	fmt.Println("publishing audio track -", t.room.LocalParticipant.Identity())
 	audioLooper, err := provider2.CreateAudioLooper()
 	if err != nil {
 		return "", err
@@ -174,13 +173,13 @@ func (t *LoadTester) PublishAudioTrack(name string) (string, error) {
 	return p.SID(), nil
 }
 
-func (t *LoadTester) PublishVideoTrack(name, resolution, codec string) (string, error) {
+func (t *LoadTester) PublishVideoTrack(name, resolution, codec string, isFairproc bool, videoWidth int, videoHeight int, frameRate int) (string, error) {
 	if !t.IsRunning() {
 		return "", nil
 	}
 
 	fmt.Println("publishing video track -", t.room.LocalParticipant.Identity())
-	loopers, err := provider2.CreateVideoLoopers(resolution, codec, false)
+	loopers, err := provider2.CreateVideoLoopers(resolution, codec, false, isFairproc, videoWidth, videoHeight, frameRate)
 	if err != nil {
 		return "", err
 	}
@@ -205,7 +204,7 @@ func (t *LoadTester) PublishSimulcastTrack(name, resolution, codec string) (stri
 	var tracks []*lksdk.LocalTrack
 
 	fmt.Println("publishing simulcast video track -", t.room.LocalParticipant.Identity())
-	loopers, err := provider2.CreateVideoLoopers(resolution, codec, true)
+	loopers, err := provider2.CreateVideoLoopers(resolution, codec, true, false, -1, -1, -1)
 	if err != nil {
 		return "", err
 	}
@@ -213,8 +212,7 @@ func (t *LoadTester) PublishSimulcastTrack(name, resolution, codec string) (stri
 	for i, looper := range loopers {
 		layer := looper.ToLayer(livekit.VideoQuality(i))
 
-		track, err := lksdk.NewLocalTrack(looper.Codec(),
-			lksdk.WithSimulcast("loadtest-video", layer))
+		track, err := lksdk.NewLocalTrack(looper.Codec(), lksdk.WithSimulcast("loadtest-video", layer))
 		if err != nil {
 			return "", err
 		}

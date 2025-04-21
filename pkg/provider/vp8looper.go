@@ -28,7 +28,7 @@ import (
 	lksdk "github.com/livekit/server-sdk-go/v2"
 )
 
-type VP8VideoLooper struct {
+type VPVideoLooper struct {
 	lksdk.BaseSampleProvider
 	buffer        []byte
 	frameDuration time.Duration
@@ -36,12 +36,14 @@ type VP8VideoLooper struct {
 	reader        *ivfreader.IVFReader
 	ivfTimebase   float64
 	lastTimestamp uint64
+	isVp9Encoding bool
 }
 
-func NewVP8VideoLooper(input io.Reader, spec *videoSpec) (*VP8VideoLooper, error) {
-	l := &VP8VideoLooper{
+func NewVPVideoLooper(input io.Reader, spec *videoSpec, isVp9Encoding bool) (*VPVideoLooper, error) {
+	l := &VPVideoLooper{
 		spec:          spec,
 		frameDuration: time.Second / time.Duration(spec.fps),
+		isVp9Encoding: isVp9Encoding,
 	}
 
 	buf := bytes.NewBuffer(nil)
@@ -54,9 +56,13 @@ func NewVP8VideoLooper(input io.Reader, spec *videoSpec) (*VP8VideoLooper, error
 	return l, nil
 }
 
-func (l *VP8VideoLooper) Codec() webrtc.RTPCodecCapability {
+func (l *VPVideoLooper) Codec() webrtc.RTPCodecCapability {
+	encoding := "vp9"
+	if !l.isVp9Encoding {
+		encoding = "vp8"
+	}
 	return webrtc.RTPCodecCapability{
-		MimeType:  "video/vp8",
+		MimeType:  "video/" + encoding,
 		ClockRate: 90000,
 		RTCPFeedback: []webrtc.RTCPFeedback{
 			{Type: webrtc.TypeRTCPFBNACK},
@@ -65,19 +71,20 @@ func (l *VP8VideoLooper) Codec() webrtc.RTPCodecCapability {
 	}
 }
 
-func (l *VP8VideoLooper) NextSample(_ctx context.Context) (media.Sample, error) {
+func (l *VPVideoLooper) NextSample(_ctx context.Context) (media.Sample, error) {
 	return l.nextSample(true)
 }
 
-func (l *VP8VideoLooper) ToLayer(quality livekit.VideoQuality) *livekit.VideoLayer {
+func (l *VPVideoLooper) ToLayer(quality livekit.VideoQuality) *livekit.VideoLayer {
 	return l.spec.ToVideoLayer(quality)
 }
 
-func (l *VP8VideoLooper) nextSample(rewindEOF bool) (media.Sample, error) {
+func (l *VPVideoLooper) nextSample(rewindEOF bool) (media.Sample, error) {
 	sample := media.Sample{}
 	if l.reader == nil {
 		var err error
 		var ivfheader *ivfreader.IVFFileHeader
+
 		l.reader, ivfheader, err = ivfreader.NewWith(bytes.NewReader(l.buffer))
 		if err != nil {
 			return sample, err

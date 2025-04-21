@@ -1,0 +1,30 @@
+{
+  "[go]": {
+    "editor.insertSpaces": false,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "go.gopath": null,
+  "go.inferGopath": true,
+  "go.inlayHints.compositeLiteralTypes": true,
+  "go.inlayHints.constantValues": true,
+  "go.inlayHints.functionTypeParameters": true,
+  "go.inlayHints.parameterNames": true,
+  "go.inlayHints.rangeVariableTypes": true,
+  "go.lintTool": "golint",
+  "go.goroot": "~/work/softwares/go",
+  "go.alternateTools": {
+    "gopls": "~/work/gopls",
+    "gofmt": "~/work/softwares/go/bin/gofmt",
+    "golint": "~/work/softwares/go/bin/gofmt"
+  },
+  "gopls": {
+    "ui.semanticTokens": true
+  },
+  "go.formatTool": "gofmt",
+  "cSpell.words": [
+    "Preparetokens"
+  ]
+}

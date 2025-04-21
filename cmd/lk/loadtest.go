@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -32,9 +33,15 @@ var LoadTestCommands = []*cli.Command{
 		Usage:  "Run load tests against LiveKit with simulated publishers & subscribers",
 		Action: loadTest,
 		Flags: []cli.Flag{
+			&cli.IntFlag{
+				Name:  "room-count",
+				Value: 1,
+				Usage: "`room-count` is total rooms for the load testing",
+			},
 			&cli.StringFlag{
 				Name:  "room",
-				Usage: "`NAME` of the room (default to random name)",
+				Usage: "`NAME` of the room (default to load-test), if there are multiple rooms will be used as prefix",
+				Value: "load-test",
 			},
 			&cli.DurationFlag{
 				Name:  "duration",
@@ -63,9 +70,49 @@ var LoadTestCommands = []*cli.Command{
 				Usage: "Resolution `QUALITY` of video to publish (\"high\", \"medium\", or \"low\")",
 				Value: "high",
 			},
+			&cli.IntFlag{
+				Name:  "fairproc-config-web-width",
+				Usage: "`fairproc-config-web-width` of web cam video (300 by default)",
+				Value: -1,
+			},
+			&cli.IntFlag{
+				Name:  "fairproc-config-web-height",
+				Usage: "`fairproc-config-web-hegiht` of web cam video (200 by default)",
+				Value: -1,
+			},
+			&cli.IntFlag{
+				Name:  "fairproc-config-web-bitrate",
+				Usage: "`fairproc-config-web-bitrate` of web cam video (29k bitrate by defaults)",
+				Value: -1,
+			},
+			&cli.IntFlag{
+				Name:  "fairproc-config-screen-width",
+				Usage: "`fairproc-config-screen-width` of web cam video (300 by default)",
+				Value: -1,
+			},
+			&cli.IntFlag{
+				Name:  "fairproc-config-screen-height",
+				Usage: "`fairproc-config-screen-hegiht` of web cam video (200 by default)",
+				Value: -1,
+			},
+			&cli.IntFlag{
+				Name:  "fairproc-config-screen-bitrate",
+				Usage: "`fairproc-config-screen-bitrate` of web cam video (50k bitrate by defaults)",
+				Value: -1,
+			},
+			&cli.IntFlag{
+				Name:  "fairproc-config-audio-bitrate",
+				Usage: "`fairproc-config-screen-bitrate` of audio (16k bitrate by defaults)",
+				Value: 16,
+			},
+			&cli.BoolFlag{
+				Name:  "fairproc-rooms",
+				Usage: "`fairproc-rooms` is fairproc rooms",
+				Value: false,
+			},
 			&cli.StringFlag{
 				Name:  "video-codec",
-				Usage: "`CODEC` \"h264\" or \"vp8\", both will be used when unset",
+				Usage: "`CODEC` \"h264\" or \"vp8\" \"vp9\", both will be used when unset",
 			},
 			&cli.FloatFlag{
 				Name:  "num-per-second",
@@ -106,12 +153,20 @@ func loadTest(ctx context.Context, cmd *cli.Command) error {
 	_ = raiseULimit()
 
 	params := loadtester.Params{
-		VideoResolution:  cmd.String("video-resolution"),
-		VideoCodec:       cmd.String("video-codec"),
-		Duration:         cmd.Duration("duration"),
-		NumPerSecond:     cmd.Float("num-per-second"),
-		Simulcast:        !cmd.Bool("no-simulcast"),
-		SimulateSpeakers: cmd.Bool("simulate-speakers"),
+		VideoResolution:             cmd.String("video-resolution"),
+		VideoCodec:                  cmd.String("video-codec"),
+		Duration:                    cmd.Duration("duration"),
+		NumPerSecond:                cmd.Float("num-per-second"),
+		Simulcast:                   !cmd.Bool("no-simulcast"),
+		SimulateSpeakers:            cmd.Bool("simulate-speakers"),
+		FairprocConfigWebWidth:      int(cmd.Int("fairproc-config-web-width")),
+		FairprocConfigWebHieght:     int(cmd.Int("fairproc-config-web-height")),
+		FairprocConfigWebBitrate:    int(cmd.Int("fairproc-config-web-bitrate")),
+		FairprocConfigScreenWidth:   int(cmd.Int("fairproc-config-screen-width")),
+		FairprocConfigScreenHeight:  int(cmd.Int("fairproc-config-screen-height")),
+		FairprocConfigScreenBitrate: int(cmd.Int("fairproc-config-screen-bitrate")),
+		FairprocAudioBitrate:        int(cmd.Int("fairproc-config-audio-bitrate")),
+		IsFairproc:                  bool(cmd.Bool("fairproc-rooms")),
 		TesterParams: loadtester.TesterParams{
 			URL:            pc.URL,
 			APIKey:         pc.APIKey,
@@ -134,6 +189,16 @@ func loadTest(ctx context.Context, cmd *cli.Command) error {
 	params.VideoPublishers = int(cmd.Int("video-publishers"))
 	params.AudioPublishers = int(cmd.Int("audio-publishers"))
 	params.Subscribers = int(cmd.Int("subscribers"))
+
+	if params.IsFairproc {
+		if params.FairprocAudioBitrate == -1 || params.FairprocConfigScreenHeight == -1 || params.FairprocConfigScreenWidth == -1 ||
+			params.FairprocConfigWebBitrate == -1 || params.FairprocConfigWebHieght == -1 || params.FairprocConfigWebWidth == -1 {
+			return fmt.Errorf("fairproc missing required files")
+		} else {
+			params.AudioPublishers = 2
+			params.VideoPublishers = 3
+		}
+	}
 
 	test := loadtester.NewLoadTest(params)
 	return test.Run(ctx)

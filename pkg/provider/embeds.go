@@ -28,6 +28,7 @@ import (
 const (
 	h264Codec = "h264"
 	vp8Codec  = "vp8"
+	vp9Codec  = "vp9"
 )
 
 type videoSpec struct {
@@ -139,20 +140,33 @@ func randomVideoSpecsForCodec(videoCodec string) []*videoSpec {
 	return filtered[chosen]
 }
 
-func CreateVideoLoopers(resolution string, codecFilter string, simulcast bool) ([]VideoLooper, error) {
-	specs := randomVideoSpecsForCodec(codecFilter)
-	numToKeep := 0
-	switch resolution {
-	case "medium":
-		numToKeep = 2
-	case "low":
-		numToKeep = 1
-	default:
-		numToKeep = 3
-	}
-	specs = specs[:numToKeep]
-	if !simulcast {
-		specs = specs[numToKeep-1:]
+func CreateVideoLoopers(resolution string, codecFilter string, simulcast bool, isFairproc bool, videoWidth int, videoHeight int, frameRate int) ([]VideoLooper, error) {
+	var specs []*videoSpec
+	if !isFairproc {
+		specs = randomVideoSpecsForCodec(codecFilter)
+		numToKeep := 0
+		switch resolution {
+		case "medium":
+			numToKeep = 2
+		case "low":
+			numToKeep = 1
+		default:
+			numToKeep = 3
+		}
+		specs = specs[:numToKeep]
+		if !simulcast {
+			specs = specs[numToKeep-1:]
+		}
+	} else {
+		specs = make([]*videoSpec, 0)
+		specs = append(specs, &videoSpec{
+			prefix: "butterfly",
+			codec:  codecFilter,
+			kbps:   25,
+			fps:    frameRate,
+			height: videoHeight,
+			width:  videoHeight,
+		})
 	}
 	loopers := make([]VideoLooper, 0)
 	for _, spec := range specs {
@@ -168,7 +182,13 @@ func CreateVideoLoopers(resolution string, codecFilter string, simulcast bool) (
 			}
 			loopers = append(loopers, looper)
 		} else if spec.codec == vp8Codec {
-			looper, err := NewVP8VideoLooper(f, spec)
+			looper, err := NewVPVideoLooper(f, spec, false)
+			if err != nil {
+				return nil, err
+			}
+			loopers = append(loopers, looper)
+		} else if spec.codec == vp9Codec {
+			looper, err := NewVPVideoLooper(f, spec, true)
 			if err != nil {
 				return nil, err
 			}

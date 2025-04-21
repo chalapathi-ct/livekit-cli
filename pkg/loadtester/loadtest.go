@@ -48,10 +48,18 @@ type Params struct {
 	VideoCodec      string
 	Duration        time.Duration
 	// number of seconds to spin up per second
-	NumPerSecond     float64
-	Simulcast        bool
-	SimulateSpeakers bool
-
+	NumPerSecond                float64
+	Simulcast                   bool
+	SimulateSpeakers            bool
+	RoomCount                   int
+	FairprocConfigWebWidth      int
+	FairprocConfigWebHieght     int
+	FairprocConfigWebBitrate    int
+	FairprocConfigScreenWidth   int
+	FairprocConfigScreenHeight  int
+	FairprocConfigScreenBitrate int
+	FairprocAudioBitrate        int
+	IsFairproc                  bool
 	TesterParams
 }
 
@@ -302,82 +310,105 @@ func (t *LoadTest) run(ctx context.Context, params Params) (map[string]*testerSt
 		maxPublishers = params.AudioPublishers
 	}
 
-	// throttle pace of join events
-	limiter := rate.NewLimiter(rate.Limit(params.NumPerSecond), 1)
-	for i := 0; i < maxPublishers+params.Subscribers; i++ {
-		testerParams := params.TesterParams
-		testerParams.Sequence = i
-		testerParams.expectedTracks = expectedTracks
-		isVideoPublisher := i < params.VideoPublishers
-		isAudioPublisher := i < params.AudioPublishers
-		if isVideoPublisher || isAudioPublisher {
-			// publishers would not get their own tracks
-			testerParams.expectedTracks = 0
-			testerParams.IdentityPrefix += "_pub"
-			testerParams.name = fmt.Sprintf("Pub %d", i)
-		} else {
-			testerParams.Subscribe = true
-			testerParams.name = fmt.Sprintf("Sub %d", i-params.VideoPublishers)
-		}
-
-		tester := NewLoadTester(testerParams)
-		testers = append(testers, tester)
-		if isVideoPublisher || isAudioPublisher {
-			publishers = append(publishers, tester)
-		}
-
-		group.Go(func() error {
-			if err := tester.Start(); err != nil {
-				fmt.Println(errors.Wrapf(err, "could not connect %s", testerParams.name))
-				errs.Store(testerParams.name, err)
-				return nil
-			}
-
-			if isAudioPublisher {
-				audio, err := tester.PublishAudioTrack("audio")
-				if err != nil {
-					errs.Store(testerParams.name, err)
-					return nil
-				}
-				t.lock.Lock()
-				t.trackNames[audio] = fmt.Sprintf("%dA", testerParams.Sequence)
-				t.lock.Unlock()
-			}
-			if isVideoPublisher {
-				var video string
-				var err error
-				if params.Simulcast {
-					video, err = tester.PublishSimulcastTrack("video-simulcast", params.VideoResolution, params.VideoCodec)
+	for j := 0; j < params.RoomCount; j++ {
+		// throttle pace of join events
+		limiter := rate.NewLimiter(rate.Limit(params.NumPerSecond), 1)
+		for i := 0; i < maxPublishers+params.Subscribers; i++ {
+			testerParams := params.TesterParams
+			testerParams.Room = fmt.Sprintf("%s_%d", params.Room, j)
+			testerParams.Sequence = i
+			testerParams.expectedTracks = expectedTracks
+			isVideoPublisher := i < params.VideoPublishers
+			isAudioPublisher := i < params.AudioPublishers
+			if isVideoPublisher || isAudioPublisher {
+				testerParams.expectedTracks = 0
+				if !params.IsFairproc {
+					testerParams.IdentityPrefix += "_webcam_pub"
 				} else {
-					video, err = tester.PublishVideoTrack("video", params.VideoResolution, params.VideoCodec)
+					if i == 0 {
+						testerParams.IdentityPrefix += "_webcam_audio_pub"
+					} else if i == 1 {
+						testerParams.IdentityPrefix += "_third_eye_proctor_pub"
+					} else if i == 2 {
+						testerParams.IdentityPrefix += "_screen_share_pub"
+					} else {
+						testerParams.IdentityPrefix += "_pub"
+					}
 				}
-				if err != nil {
+				testerParams.name = fmt.Sprintf("Pub %d", i)
+			} else {
+				testerParams.Subscribe = true
+				testerParams.name = fmt.Sprintf("Sub %d", i-params.VideoPublishers)
+			}
+
+			tester := NewLoadTester(testerParams)
+			testers = append(testers, tester)
+			if isVideoPublisher || isAudioPublisher {
+				publishers = append(publishers, tester)
+			}
+
+			group.Go(func() error {
+				if err := tester.Start(); err != nil {
+					fmt.Println(errors.Wrapf(err, "could not connect %s", testerParams.name))
 					errs.Store(testerParams.name, err)
 					return nil
 				}
-				t.lock.Lock()
-				t.trackNames[video] = fmt.Sprintf("%dV", testerParams.Sequence)
-				t.lock.Unlock()
+
+				if isAudioPublisher {
+					audio, err := tester.PublishAudioTrack("audio")
+					if err != nil {
+						errs.Store(testerParams.name, err)
+						return nil
+					}
+					t.lock.Lock()
+					t.trackNames[audio] = fmt.Sprintf("%dA", testerParams.Sequence)
+					t.lock.Unlock()
+				}
+
+				if isVideoPublisher {
+					var video string
+					var err error
+					if params.IsFairproc {
+
+						if params.Simulcast {
+							video, err = tester.PublishSimulcastTrack("video-simulcast", params.VideoResolution, params.VideoCodec)
+						} else {
+							if i == 0 || i == 1 {
+								video, err = tester.PublishVideoTrack("video-webm", params.VideoResolution, params.VideoCodec, true, params.FairprocConfigWebWidth, params.FairprocConfigScreenHeight, params.FairprocConfigScreenBitrate)
+							}
+							if i == 2 {
+								video, err = tester.PublishVideoTrack("video-screen-share", params.VideoResolution, params.VideoCodec, true, params.FairprocConfigScreenWidth, params.FairprocConfigScreenHeight, params.FairprocAudioBitrate)
+							}
+						}
+					}
+					if err != nil {
+						errs.Store(testerParams.name, err)
+						return nil
+					}
+					t.lock.Lock()
+					t.trackNames[video] = fmt.Sprintf("%dV", testerParams.Sequence)
+					t.lock.Unlock()
+				}
+				return nil
+			})
+
+			if err := ctx.Err(); err != nil {
+				return nil, err
 			}
-			return nil
-		})
 
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		if err := limiter.Wait(ctx); err != nil {
-			return nil, err
+			if err := limiter.Wait(ctx); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	var speakerSim *SpeakerSimulator
+	/* var speakerSim *SpeakerSimulator
 	if len(publishers) > 0 && t.Params.SimulateSpeakers {
 		speakerSim = NewSpeakerSimulator(SpeakerSimulatorParams{
 			Testers: publishers,
 		})
 		speakerSim.Start()
-	}
+	} */
 	if err := group.Wait(); err != nil {
 		return nil, err
 	}
@@ -396,9 +427,9 @@ func (t *LoadTest) run(ctx context.Context, params Params) (map[string]*testerSt
 		// finished
 	}
 
-	if speakerSim != nil {
+	/* if speakerSim != nil {
 		speakerSim.Stop()
-	}
+	} */
 
 	stats := make(map[string]*testerStats)
 	for _, t := range testers {
