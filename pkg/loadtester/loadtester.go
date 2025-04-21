@@ -173,13 +173,13 @@ func (t *LoadTester) PublishAudioTrack(name string) (string, error) {
 	return p.SID(), nil
 }
 
-func (t *LoadTester) PublishVideoTrack(name, resolution, codec string, isFairproc bool, videoWidth int, videoHeight int, frameRate int) (string, error) {
+func (t *LoadTester) PublishVideoTrack(name, resolution, codec string, isFairproc bool, videoWidth int, videoHeight int, frameRate int, bitrate int) (string, error) {
 	if !t.IsRunning() {
 		return "", nil
 	}
 
 	fmt.Println("publishing video track -", t.room.LocalParticipant.Identity())
-	loopers, err := provider2.CreateVideoLoopers(resolution, codec, false, isFairproc, videoWidth, videoHeight, frameRate)
+	loopers, err := provider2.CreateVideoLoopers(resolution, codec, false, isFairproc, videoWidth, videoHeight, frameRate, bitrate)
 	if err != nil {
 		return "", err
 	}
@@ -204,7 +204,7 @@ func (t *LoadTester) PublishSimulcastTrack(name, resolution, codec string) (stri
 	var tracks []*lksdk.LocalTrack
 
 	fmt.Println("publishing simulcast video track -", t.room.LocalParticipant.Identity())
-	loopers, err := provider2.CreateVideoLoopers(resolution, codec, true, false, -1, -1, -1)
+	loopers, err := provider2.CreateVideoLoopers(resolution, codec, true, false, -1, -1, -1, -1)
 	if err != nil {
 		return "", err
 	}

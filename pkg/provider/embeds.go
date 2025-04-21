@@ -140,7 +140,7 @@ func randomVideoSpecsForCodec(videoCodec string) []*videoSpec {
 	return filtered[chosen]
 }
 
-func CreateVideoLoopers(resolution string, codecFilter string, simulcast bool, isFairproc bool, videoWidth int, videoHeight int, frameRate int) ([]VideoLooper, error) {
+func CreateVideoLoopers(resolution string, codecFilter string, simulcast bool, isFairproc bool, videoWidth int, videoHeight int, frameRate int, birate int) ([]VideoLooper, error) {
 	var specs []*videoSpec
 	if !isFairproc {
 		specs = randomVideoSpecsForCodec(codecFilter)
@@ -162,7 +162,7 @@ func CreateVideoLoopers(resolution string, codecFilter string, simulcast bool, i
 		specs = append(specs, &videoSpec{
 			prefix: "butterfly",
 			codec:  codecFilter,
-			kbps:   25,
+			kbps:   birate,
 			fps:    frameRate,
 			height: videoHeight,
 			width:  videoHeight,

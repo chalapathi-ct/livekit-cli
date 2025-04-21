@@ -48,18 +48,20 @@ type Params struct {
 	VideoCodec      string
 	Duration        time.Duration
 	// number of seconds to spin up per second
-	NumPerSecond                float64
-	Simulcast                   bool
-	SimulateSpeakers            bool
-	RoomCount                   int
-	FairprocConfigWebWidth      int
-	FairprocConfigWebHieght     int
-	FairprocConfigWebBitrate    int
-	FairprocConfigScreenWidth   int
-	FairprocConfigScreenHeight  int
-	FairprocConfigScreenBitrate int
-	FairprocAudioBitrate        int
-	IsFairproc                  bool
+	NumPerSecond                  float64
+	Simulcast                     bool
+	SimulateSpeakers              bool
+	RoomCount                     int
+	FairprocConfigWebWidth        int
+	FairprocConfigWebHieght       int
+	FairprocConfigWebFrameRate    int
+	FairprocConfigWebBitrate      int
+	FairprocConfigScreenWidth     int
+	FairprocConfigScreenHeight    int
+	FairprocConfigScreenFrameRate int
+	FairprocConfigScreenBitrate   int
+	FairprocAudioBitrate          int
+	IsFairproc                    bool
 	TesterParams
 }
 
@@ -374,10 +376,10 @@ func (t *LoadTest) run(ctx context.Context, params Params) (map[string]*testerSt
 							video, err = tester.PublishSimulcastTrack("video-simulcast", params.VideoResolution, params.VideoCodec)
 						} else {
 							if i == 0 || i == 1 {
-								video, err = tester.PublishVideoTrack("video-webm", params.VideoResolution, params.VideoCodec, true, params.FairprocConfigWebWidth, params.FairprocConfigScreenHeight, params.FairprocConfigScreenBitrate)
+								video, err = tester.PublishVideoTrack("video-webm", params.VideoResolution, params.VideoCodec, true, params.FairprocConfigWebWidth, params.FairprocConfigScreenHeight, params.FairprocConfigWebFrameRate, params.FairprocConfigWebBitrate)
 							}
 							if i == 2 {
-								video, err = tester.PublishVideoTrack("video-screen-share", params.VideoResolution, params.VideoCodec, true, params.FairprocConfigScreenWidth, params.FairprocConfigScreenHeight, params.FairprocAudioBitrate)
+								video, err = tester.PublishVideoTrack("video-screen-share", params.VideoResolution, params.VideoCodec, true, params.FairprocConfigScreenWidth, params.FairprocConfigScreenHeight, params.FairprocConfigScreenFrameRate, params.FairprocConfigScreenBitrate)
 							}
 						}
 					}
