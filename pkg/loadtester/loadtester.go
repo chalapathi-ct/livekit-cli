@@ -38,8 +38,6 @@ type LoadTester struct {
 	room                   *lksdk.Room
 	running                atomic.Bool
 	trackQualities         map[string]livekit.VideoQuality
-	bitrate                int64
-	videoQuality           string // 1280x5x3 widhtxheightxframerate
 	stats                  *sync.Map
 }
 
