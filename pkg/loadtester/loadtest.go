@@ -304,7 +304,7 @@ func (t *LoadTest) run(ctx context.Context, params Params) (map[string]*testerSt
 	fmt.Printf("Starting load test with %s, room: %s\n",
 		strings.Join(participantStrings, ", "), params.Room)
 
-	var publishers, testers []*LoadTester
+	var testers []*LoadTester
 	group, _ := errgroup.WithContext(ctx)
 	errs := syncmap.Map{}
 	maxPublishers := params.VideoPublishers
@@ -345,9 +345,6 @@ func (t *LoadTest) run(ctx context.Context, params Params) (map[string]*testerSt
 
 			tester := NewLoadTester(testerParams)
 			testers = append(testers, tester)
-			if isVideoPublisher || isAudioPublisher {
-				publishers = append(publishers, tester)
-			}
 
 			group.Go(func() error {
 				if err := tester.Start(); err != nil {
